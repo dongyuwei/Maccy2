@@ -88,6 +88,11 @@ struct ToolbarView: View {
       && appState.navigator.selection.items.contains { !$0.isPinned }
   }
 
+  private var allSelectedSensitive: Bool {
+    !appState.navigator.selection.items.isEmpty
+      && appState.navigator.selection.items.allSatisfy { $0.item.isSensitive }
+  }
+
   private var selectedImageItem: HistoryItemDecorator? {
     guard appState.navigator.selection.count == 1,
           let item = appState.navigator.selection.first,
@@ -141,6 +146,18 @@ struct ToolbarView: View {
           replacementKey: "pinKey"
         )
         .disabled(pinActionDisabled)
+
+        ToolbarButton {
+          appState.toggleSensitive()
+        } label: {
+          Image(systemName: allSelectedSensitive ? "eye" : "eye.slash")
+        }
+        .shortcutKeyHelp(
+          key: allSelectedSensitive ? "UnmaskKey" : "MaskKey",
+          tableName: "PreviewItemView",
+          replacementKey: "maskKey"
+        )
+        .accessibilityLabel(Text(allSelectedSensitive ? "UnmaskKey" : "MaskKey", tableName: "PreviewItemView"))
 
         ToolbarButton {
           appState.deleteSelection()

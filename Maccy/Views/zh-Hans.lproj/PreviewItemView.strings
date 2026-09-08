@@ -9,3 +9,8 @@
 "ClosePreview" = "按 {previewKey} 隐藏预览。";
 "Dimensions" = "尺寸:";
 "CopyExtractedText" = "复制提取的文本。";
+"MaskKey" = "隐藏敏感内容。";
+"UnmaskKey" = "显示敏感内容。";
+"Sensitive" = "敏感：";
+"Reveal" = "显示内容";
+"Conceal" = "隐藏内容";

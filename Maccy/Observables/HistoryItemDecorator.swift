@@ -24,6 +24,20 @@ class HistoryItemDecorator: Identifiable, Hashable, HasVisibility {
     return selectionIndex != -1
   }
   var shortcuts: [KeyShortcut] = []
+  // Temporary per-session reveal of a sensitive item's content.
+  var isRevealed: Bool = false
+
+  var isMasked: Bool {
+    item.isSensitive && !isRevealed
+  }
+
+  var displayTitle: String {
+    isMasked ? HistoryItem.maskedText(for: title) : title
+  }
+
+  var displayPreviewText: String {
+    isMasked ? HistoryItem.maskedText(for: previewText) : previewText
+  }
 
   var application: String? {
     if item.universalClipboard {
@@ -79,7 +93,7 @@ class HistoryItemDecorator: Identifiable, Hashable, HasVisibility {
       let size = image.pixelSize
       parts.append(String(format: NSLocalizedString("history_item_image_accessibility_label_no_app", comment: ""), Int(size.width), Int(size.height)))
     } else {
-      parts.append(title)
+      parts.append(displayTitle)
     }
     if let application = application {
       parts.append(application)
@@ -180,6 +194,13 @@ class HistoryItemDecorator: Identifiable, Hashable, HasVisibility {
 
   func highlight(_ query: String, _ ranges: [Range<String.Index>]) {
     guard !query.isEmpty, !title.isEmpty else {
+      attributedTitle = nil
+      return
+    }
+
+    // Highlight ranges refer to the real title; rendering them would reveal
+    // masked content, so masked items are shown as plain masked text.
+    guard !isMasked else {
       attributedTitle = nil
       return
     }

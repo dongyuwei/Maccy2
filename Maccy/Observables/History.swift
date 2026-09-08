@@ -108,6 +108,8 @@ class History: ItemsContainer { // swiftlint:disable:this type_body_length
     all = sorter.sort(results).map { HistoryItemDecorator($0) }
     items = all
 
+    normalizePinOrders()
+
     limitHistorySize(to: Defaults[.size])
 
     updateShortcuts()
@@ -125,12 +127,38 @@ class History: ItemsContainer { // swiftlint:disable:this type_body_length
     }
   }
 
+  // Assign sequential manual order to pinned items so they can be re-ordered.
+  // Items pinned before this field existed have pinOrder 0 and are numbered
+  // according to their current display order.
+  @MainActor
+  private func normalizePinOrders() {
+    var changed = false
+    var order = 0
+    for decorator in pinnedItems {
+      order += 1
+      if decorator.item.pinOrder != order {
+        decorator.item.pinOrder = order
+        changed = true
+      }
+    }
+
+    guard changed else { return }
+    Storage.shared.context.processPendingChanges()
+    try? Storage.shared.context.save()
+  }
+
   @MainActor
   func insertIntoStorage(_ item: HistoryItem) throws {
     logger.info("Inserting item with id '\(item.title)'")
     Storage.shared.context.insert(item)
     Storage.shared.context.processPendingChanges()
     try? Storage.shared.context.save()
+  }
+
+  @MainActor
+  func persist() throws {
+    Storage.shared.context.processPendingChanges()
+    try Storage.shared.context.save()
   }
 
   @discardableResult
@@ -151,6 +179,7 @@ class History: ItemsContainer { // swiftlint:disable:this type_body_length
       item.firstCopiedAt = existingHistoryItem.firstCopiedAt
       item.numberOfCopies += existingHistoryItem.numberOfCopies
       item.pin = existingHistoryItem.pin
+      item.pinOrder = existingHistoryItem.pinOrder
       item.title = existingHistoryItem.title
       if !item.fromMaccy {
         item.application = existingHistoryItem.application
@@ -449,6 +478,13 @@ class History: ItemsContainer { // swiftlint:disable:this type_body_length
   @MainActor
   func togglePin(_ item: HistoryItemDecorator?) {
     guard let item else { return }
+
+    if item.isUnpinned {
+      // New pins are appended to the end of the manual pin order.
+      item.item.pinOrder = (pinnedItems.map(\.item.pinOrder).max() ?? 0) + 1
+    } else {
+      item.item.pinOrder = 0
+    }
 
     item.togglePin()
 

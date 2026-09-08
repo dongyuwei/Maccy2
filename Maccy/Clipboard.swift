@@ -104,7 +104,7 @@ class Clipboard {
     sync()
 
     Task {
-      Notifier.notify(body: item.title, sound: .knock)
+      Notifier.notify(body: item.safeTitle, sound: .knock)
       checkForChangesInPasteboard()
     }
   }

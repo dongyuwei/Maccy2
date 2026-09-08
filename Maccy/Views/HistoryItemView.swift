@@ -55,7 +55,7 @@ struct HistoryItemView: View {
       selectionAppearance: selectionAppearance,
       accessibilityLabel: item.accessibilityLabel
     ) {
-      Text(verbatim: item.title)
+      Text(verbatim: item.displayTitle)
     }
     .accessibilityIdentifier("copy-history-item")
     .buttonAction(performSelect)

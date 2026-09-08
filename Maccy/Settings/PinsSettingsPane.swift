@@ -36,6 +36,7 @@ struct PinValueView: View {
   @State private var editableValue: String
   @State private var isTextContent: Bool
   @State private var isRichText: Bool
+  @State private var isRevealed: Bool = false
   @FocusState private var isEditing: Bool
   @State private var showWarningPopover: Bool = false
 
@@ -57,27 +58,51 @@ struct PinValueView: View {
   var body: some View {
     Group {
       if isTextContent || isRichText {
-        ZStack(alignment: .trailing) {
-          TextField("", text: $editableValue)
-            .focused($isEditing)
-            .onSubmit {
-              updateItemContent()
+        if item.isSensitive && !isRevealed {
+          HStack(spacing: 4) {
+            Text(verbatim: HistoryItem.maskedText(for: editableValue))
+              .foregroundStyle(.secondary)
+              .lineLimit(1)
+              .truncationMode(.middle)
+            Spacer(minLength: 0)
+            Button {
+              isRevealed = true
+            } label: {
+              Image(systemName: "eye")
             }
-            .onChange(of: editableValue) { _, _ in
-              updateItemContent()
-            }
-            .padding(.trailing, isRichText ? 40 : 0) // increased space for icon
-            .accessibilityLabel(Text("Content", tableName: "PinsSettings"))
+            .buttonStyle(.borderless)
+            .help(Text("Reveal", tableName: "PinsSettings"))
+          }
+        } else {
+          ZStack(alignment: .trailing) {
+            TextField("", text: $editableValue)
+              .focused($isEditing)
+              .onSubmit {
+                updateItemContent()
+              }
+              .onChange(of: editableValue) { _, _ in
+                updateItemContent()
+              }
+              .padding(.trailing, trailingOverlayWidth)
+              .accessibilityLabel(Text("Content", tableName: "PinsSettings"))
 
-          if isRichText && isEditing {
-            HStack(spacing: 0) {
+            HStack(spacing: 4) {
               Spacer(minLength: 0)
-              Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(.orange)
-                .help(Text("RichTextEditWarning", tableName: "PinsSettings"))
-              Spacer().frame(width: 4)
+              if isRichText && isEditing {
+                Image(systemName: "exclamationmark.triangle.fill")
+                  .foregroundColor(.orange)
+                  .help(Text("RichTextEditWarning", tableName: "PinsSettings"))
+              }
+              if item.isSensitive {
+                Button {
+                  isRevealed = false
+                } label: {
+                  Image(systemName: "eye.slash")
+                }
+                .buttonStyle(.borderless)
+                .help(Text("Conceal", tableName: "PinsSettings"))
+              }
             }
-            .frame(maxHeight: .infinity, alignment: .center)
             .padding(.trailing, 4)
           }
         }
@@ -88,6 +113,17 @@ struct PinValueView: View {
           .italic()
       }
     }
+  }
+
+  private var trailingOverlayWidth: CGFloat {
+    var width: CGFloat = 0
+    if isRichText && isEditing {
+      width += 20
+    }
+    if item.isSensitive {
+      width += 24
+    }
+    return width == 0 ? 0 : width + 8
   }
 
   private func updateItemContent() {
@@ -118,7 +154,7 @@ struct PinsSettingsPane: View {
   @Environment(AppState.self) private var appState
   @Environment(\.modelContext) private var modelContext
 
-  @Query(filter: #Predicate<HistoryItem> { $0.pin != nil }, sort: \.firstCopiedAt)
+  @Query(filter: #Predicate<HistoryItem> { $0.pin != nil }, sort: \.pinOrder)
   private var items: [HistoryItem]
 
   @State private var availablePins: [String] = []
@@ -127,6 +163,29 @@ struct PinsSettingsPane: View {
   var body: some View {
     VStack(alignment: .leading) {
       Table(items, selection: $selection) {
+        TableColumn(Text("Order", tableName: "PinsSettings")) { item in
+          HStack(spacing: 2) {
+            Button {
+              movePin(item, offset: -1)
+            } label: {
+              Image(systemName: "chevron.up")
+            }
+            .buttonStyle(.borderless)
+            .disabled(item.pinOrder <= minPinOrder)
+            .accessibilityLabel(Text("MoveUp", tableName: "PinsSettings"))
+
+            Button {
+              movePin(item, offset: 1)
+            } label: {
+              Image(systemName: "chevron.down")
+            }
+            .buttonStyle(.borderless)
+            .disabled(item.pinOrder >= maxPinOrder)
+            .accessibilityLabel(Text("MoveDown", tableName: "PinsSettings"))
+          }
+        }
+        .width(60)
+
         TableColumn(Text("Key", tableName: "PinsSettings")) { item in
           PinPickerView(item: item, availablePins: availablePins)
             .onChange(of: item.pin) {
@@ -138,6 +197,18 @@ struct PinsSettingsPane: View {
         TableColumn(Text("Alias", tableName: "PinsSettings")) { item in
           PinTitleView(item: item)
         }
+
+        TableColumn(Text("Sensitive", tableName: "PinsSettings")) { item in
+          Button {
+            item.isSensitive.toggle()
+            persist()
+          } label: {
+            Image(systemName: item.isSensitive ? "eye.slash.fill" : "eye.slash")
+          }
+          .buttonStyle(.borderless)
+          .help(Text(item.isSensitive ? "Conceal" : "Reveal", tableName: "PinsSettings"))
+        }
+        .width(70)
 
         TableColumn(Text("Content", tableName: "PinsSettings")) { item in
           PinValueView(item: item)
@@ -161,6 +232,42 @@ struct PinsSettingsPane: View {
     }
     .frame(minWidth: 500, minHeight: 400)
     .padding()
+  }
+
+  private var minPinOrder: Int {
+    items.map(\.pinOrder).min() ?? 0
+  }
+
+  private var maxPinOrder: Int {
+    items.map(\.pinOrder).max() ?? 0
+  }
+
+  // Moves the pin within the manual order and refreshes the popup list.
+  private func movePin(_ item: HistoryItem, offset: Int) {
+    guard let index = items.firstIndex(where: { $0.id == item.id }) else {
+      return
+    }
+
+    let targetIndex = index + offset
+    guard items.indices.contains(targetIndex) else {
+      return
+    }
+
+    var reordered = items
+    reordered.swapAt(index, targetIndex)
+    for (order, item) in reordered.enumerated() {
+      item.pinOrder = order + 1
+    }
+    persist()
+
+    Task {
+      try? await appState.history.load()
+    }
+  }
+
+  private func persist() {
+    modelContext.processPendingChanges()
+    try? modelContext.save()
   }
 }
 

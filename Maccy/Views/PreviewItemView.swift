@@ -53,7 +53,7 @@ struct PreviewItemView: View {
           }
         }
       } else {
-        let text = item.previewText
+        let text = item.displayPreviewText
         if text.count >= Self.largeTextThreshold {
           LargeTextPreviewView(text: text)
             .id("textpreview-\(item.id)")
@@ -100,6 +100,19 @@ struct PreviewItemView: View {
         Text("LastCopyTime", tableName: "PreviewItemView")
         Text(item.item.lastCopiedAt, style: .date)
         Text(item.item.lastCopiedAt, style: .time)
+      }
+
+      if item.item.isSensitive {
+        HStack(spacing: 3) {
+          Text("Sensitive", tableName: "PreviewItemView")
+          Button {
+            item.isRevealed.toggle()
+          } label: {
+            Image(systemName: item.isRevealed ? "eye" : "eye.slash")
+          }
+          .buttonStyle(.plain)
+          .help(Text(item.isRevealed ? "Conceal" : "Reveal", tableName: "PreviewItemView"))
+        }
       }
 
       HStack(spacing: 3) {

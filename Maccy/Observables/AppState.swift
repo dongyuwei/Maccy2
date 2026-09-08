@@ -83,6 +83,15 @@ class AppState: Sendable {
   }
 
   @MainActor
+  func toggleSensitive() {
+    let allSensitive = navigator.selection.items.allSatisfy { $0.item.isSensitive }
+    navigator.selection.forEach { _, item in
+      item.item.isSensitive = !allSensitive
+    }
+    try? history.persist()
+  }
+
+  @MainActor
   func removePasteStack() {
     history.interruptPasteStack()
     navigator.highlightFirst()

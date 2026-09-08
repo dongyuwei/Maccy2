@@ -9,3 +9,8 @@
 "OpenPreview" = "Press {previewKey} to show preview.";
 "ClosePreview" = "Press {previewKey} to hide preview.";
 "CopyExtractedText" = "Copy extracted text.";
+"MaskKey" = "Hide sensitive content.";
+"UnmaskKey" = "Show sensitive content.";
+"Sensitive" = "Sensitive:";
+"Reveal" = "Reveal content";
+"Conceal" = "Hide content";

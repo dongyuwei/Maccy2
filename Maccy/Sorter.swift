@@ -41,10 +41,15 @@ class Sorter {
   }
 
   private func byPinned(_ lhs: HistoryItem, _ rhs: HistoryItem) -> Bool {
-    if Defaults[.pinTo] == .bottom {
-      return (lhs.pin == nil) && (rhs.pin != nil)
-    } else {
-      return (lhs.pin != nil) && (rhs.pin == nil)
+    switch (lhs.pin, rhs.pin) {
+    case (nil, nil):
+      return false
+    case (.some, nil):
+      return Defaults[.pinTo] == .top
+    case (nil, .some):
+      return Defaults[.pinTo] == .bottom
+    case (.some, .some):
+      return lhs.pinOrder < rhs.pinOrder
     }
   }
 }

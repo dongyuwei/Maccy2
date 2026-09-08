@@ -69,6 +69,10 @@ class HistoryItem {
   var lastCopiedAt: Date = Date.now
   var numberOfCopies: Int = 1
   var pin: String?
+  // Manual ordering of pinned items, assigned incrementally when pinned.
+  var pinOrder: Int = 0
+  // Sensitive items are displayed masked, but copied and pasted as-is.
+  var isSensitive: Bool = false
   var title = ""
 
   @Relationship(deleteRule: .cascade, inverse: \HistoryItemContent.item)
@@ -90,6 +94,22 @@ class HistoryItem {
       .allSatisfy { content in
         contents.contains(where: { $0.type == content.type && $0.value == content.value })
       }
+  }
+
+  // Masks every line so neither the value nor its exact length is revealed.
+  static func maskedText(for text: String) -> String {
+    return text
+      .components(separatedBy: "\n")
+      .map { line -> String in
+        let length = min(max(line.count, 6), 32)
+        return String(repeating: "•", count: length)
+      }
+      .joined(separator: "\n")
+  }
+
+  // Title safe to show in UI and notifications.
+  var safeTitle: String {
+    isSensitive ? Self.maskedText(for: title) : title
   }
 
   func generateTitle() -> String {
